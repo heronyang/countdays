@@ -3,19 +3,22 @@
 
 static Window *window;
 static TextLayer *time_layer;
+static TextLayer *date_layer;
 static Layer *circle_layer;
 
 static int hours, minutes;
 
 static void init();
 static void init_window();
-static void update_time();
+static void update_time(struct tm *);
 static void deinit();
 static void tick_handler(struct tm *, TimeUnits);
+static void update_date(struct tm *);
 static void window_load(Window *);
 static void draw_circle_layer(Layer *, GRect);
 static void draw_time(Layer *, GRect);
 static void layer_update_proc(Layer *, GContext *);
+static void draw_date(Layer *, GRect);
 static void window_unload(Window *);
 
 int main() {
@@ -29,8 +32,6 @@ int main() {
 static void init() {
 
     init_window();
-    update_time();
-
     tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
 
 }
@@ -47,10 +48,12 @@ static void init_window() {
 
 }
 
-static void update_time() {
+static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
+    update_time(tick_time);
+    update_date(tick_time);
+}
 
-    time_t temp = time(NULL);
-    struct tm *tick_time = localtime(&temp);
+static void update_time(struct tm *tick_time) {
 
     hours = tick_time->tm_hour;
     minutes = tick_time->tm_min;
@@ -63,8 +66,13 @@ static void update_time() {
 
 }
 
-static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
-    update_time();
+static void update_date(struct tm *tick_time) {
+
+    static char date_buffer[16];
+    strftime(date_buffer, sizeof(date_buffer), "%m/%d", tick_time);
+
+    text_layer_set_text(date_layer, date_buffer);
+
 }
 
 static void deinit() {
@@ -81,6 +89,7 @@ static void window_load(Window *window) {
 
     draw_circle_layer(window_layer, bounds);
     draw_time(window_layer, bounds);
+    draw_date(window_layer, bounds);
 
 }
 
@@ -129,6 +138,22 @@ static void layer_update_proc(Layer *layer, GContext *ctx) {
 
 }
 
+static void draw_date(Layer *window_layer, GRect bounds) {
+
+    static GFont font;
+
+    date_layer = text_layer_create(GRect(0,
+                TIME_LAYER_TOP - 100,
+                bounds.size.w,
+                TIME_LAYER_HEIGHT));
+    font = fonts_get_system_font(FONT_KEY_GOTHIC_28);
+    text_layer_set_text_alignment(date_layer, GTextAlignmentCenter);
+    text_layer_set_font(date_layer, font);
+    layer_add_child(window_layer, text_layer_get_layer(date_layer));
+
+}
+
 static void window_unload(Window *window) {
     text_layer_destroy(time_layer);
+    text_layer_destroy(date_layer);
 }
