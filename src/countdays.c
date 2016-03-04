@@ -1,4 +1,4 @@
-#include <pebble.h>
+#include "pebble.h"
 #include "config.h"
 
 static Window *window;
@@ -12,12 +12,12 @@ static Layer *circle_layer;
 
 static int hours, minutes;
 
-static char temperature_buffer[8];
-static char conditions_buffer[32];
-static char weather_buffer[32];
 static char time_buffer[8];
 static char date_buffer[16];
-static char countdays_buffer[8];
+// static char countdays_buffer[8];
+
+static AppSync s_sync;
+static uint8_t s_sync_buffer[64];
 
 static void init();
 static void init_callbacks();
@@ -38,42 +38,27 @@ static void draw_countdays(Layer *, GRect);
 static void window_unload(Window *);
 
 enum {
-  KEY_TEMPERATURE = 0,
-  KEY_CONDITIONS
+    KEY_TEMPERATURE = 0,
+    KEY_CONDITIONS
 };
 
-static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
+static void sync_error_callback(DictionaryResult dict_error,
+        AppMessageResult app_message_error, void *context) {
 
-    Tuple *temp_tuple = dict_find(iterator, KEY_TEMPERATURE);
-    Tuple *conditions_tuple = dict_find(iterator, KEY_CONDITIONS);
-
-    if (temp_tuple && conditions_tuple) {
-        snprintf(temperature_buffer, sizeof(temperature_buffer), "%dC", (int)temp_tuple->value->int32);
-        snprintf(conditions_buffer, sizeof(conditions_buffer), "%s", conditions_tuple->value->cstring);
-    }
-
-    snprintf(weather_buffer, sizeof(weather_buffer), "%s, %s", temperature_buffer, conditions_buffer);
-    text_layer_set_text(weather_layer, weather_buffer);
-
-    // TODO
-    int countdays = 100;
-    snprintf(countdays_buffer, sizeof(countdays_buffer), "%d", countdays);
-    text_layer_set_text(countdays_layer, countdays_buffer);
-
-    APP_LOG(APP_LOG_LEVEL_ERROR, "Message received!");
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "App Message Sync Error: %d", app_message_error);
 
 }
 
-static void inbox_dropped_callback(AppMessageResult reason, void *context) {
-    APP_LOG(APP_LOG_LEVEL_ERROR, "Message dropped!");
-}
+static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tuple, const Tuple* old_tuple, void* context) {
+  switch (key) {
+    case KEY_TEMPERATURE:
+      text_layer_set_text(weather_layer, new_tuple->value->cstring);
+      break;
 
-static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResult reason, void *context) {
-    APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed!");
-}
-
-static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
-    APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success!");
+    case KEY_CONDITIONS:
+      text_layer_set_text(weather_layer, new_tuple->value->cstring);
+      break;
+  }
 }
 
 int main(void) {
@@ -86,22 +71,18 @@ int main(void) {
 
 static void init() {
 
-    init_callbacks();
     init_window();
+    init_callbacks();
     tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
+
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "Count Days Started");
 
 }
 
 static void init_callbacks() {
 
-    app_message_register_inbox_received(inbox_received_callback);
-    app_message_register_inbox_dropped(inbox_dropped_callback);
-    app_message_register_outbox_failed(outbox_failed_callback);
-    app_message_register_outbox_sent(outbox_sent_callback);
-
-    app_message_open(app_message_inbox_size_maximum(), app_message_outbox_size_maximum());
-
-    APP_LOG(APP_LOG_LEVEL_INFO, "Callbacks inited");
+    // app_message_open(app_message_inbox_size_maximum(), app_message_outbox_size_maximum());
+    app_message_open(64, 64);
 
 }
 
@@ -115,7 +96,6 @@ static void init_window() {
             });
     window_stack_push(window, WINDOW_STACK_PUSH_ANIMATED);
 
-    APP_LOG(APP_LOG_LEVEL_INFO, "Window inited");
 }
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
@@ -127,7 +107,7 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
     update_countdays(tick_time);
 
     if(tick_time->tm_min % WEATHER_GET_EVERY_MINUTES == 0) {
-        update_weather();
+        // update_weather();
     }
 
 }
@@ -170,7 +150,12 @@ static void update_weather() {
     DictionaryIterator *iter;
     app_message_outbox_begin(&iter);
 
-    dict_write_uint8(iter, 0, 0);
+    if (!iter)  return;
+
+    int value = 1;
+    dict_write_int(iter, 1, &value, sizeof(int), true);
+    dict_write_end(iter);
+
     app_message_outbox_send();
 
 }
@@ -179,6 +164,8 @@ static void deinit() {
 
     layer_destroy(circle_layer);
     window_destroy(window);
+
+    app_sync_deinit(&s_sync);
 
 }
 
@@ -192,6 +179,17 @@ static void window_load(Window *window) {
     draw_weather(window_layer, bounds);
     draw_countdays(window_layer, bounds);
     draw_circle_layer(window_layer, bounds);
+
+    Tuplet initial_values[] = {
+        TupletInteger(KEY_TEMPERATURE, (uint8_t) 0),
+        TupletCString(KEY_CONDITIONS, "-"),
+    };
+
+    app_sync_init(&s_sync, s_sync_buffer, sizeof(s_sync_buffer),
+            initial_values, ARRAY_LENGTH(initial_values),
+            sync_tuple_changed_callback, sync_error_callback, NULL);
+
+    update_weather();
 
 }
 
