@@ -1,5 +1,5 @@
 var openWeatherMapAPIKey = '90973b6bdeeed6bb35d37c628c5a987a';
-var configureURL = 'http://localhost:8000';
+var configureURL = 'https://countdays-config.herokuapp.com/';
 
 function getWeatherFromOpenWeatherMap(coordinates) {
 
@@ -146,7 +146,8 @@ function sendCountdaysToWatch(countdays) {
 }
 
 function getConfigDataFromResponse(response) {
-  return JSON.parse(decodeURIComponent(response).substr(1));
+  console.log('response: ' + response);
+  return JSON.parse(decodeURIComponent(response));
 }
 
 function getCountDays(dreamDay) {
