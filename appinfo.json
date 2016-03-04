@@ -3,6 +3,7 @@
   "shortName": "Countdays",
   "longName": "Count Days",
   "companyName": "Heron Yang",
+  "versionCode": 1,
   "versionLabel": "1.0",
   "sdkVersion": "3",
   "targetPlatforms": ["chalk"],
@@ -10,9 +11,11 @@
     "watchface": true
   },
   "appKeys": {
-    "dummy": 0
+    "KEY_TEMPERATURE": 0,
+    "KEY_CONDITIONS": 1
   },
   "resources": {
     "media": []
-  }
+  },
+  "capabilities": ["location", "configurable"]
 }
