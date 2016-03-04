@@ -75,7 +75,8 @@ function locationError(err) {
   Pebble.sendAppMessage({
     'KEY_TEMPERATURE': ' ',
     'KEY_CONDITIONS': ' ',
-    'KEY_COUNTDAYS': ' '
+    'KEY_COUNTDAYS': ' ',
+    'KEY_COUNTDAYS_START_DATE': ' '
   });
 
 }
@@ -105,8 +106,8 @@ var locationOptions = {
 
 Pebble.addEventListener('appmessage', function(e) {
 
+  console.log('Received message: ' + JSON.stringify(e.payload));
   getWeather();
-  console.log(e.type);
 
 });
 
@@ -124,14 +125,15 @@ function setCountdaysFromResponse(response) {
   var dreamday = new Date(configData.dreamday);
   var countdays = getCountDays(dreamday);
 
-  sendCountdaysToWatch(countdays);
+  sendCountdaysToWatch(countdays, configData.dreamday);
 
 }
 
-function sendCountdaysToWatch(countdays) {
+function sendCountdaysToWatch(countdays, countdays_start_date) {
 
   var data = {
     'KEY_COUNTDAYS': countdays + '',
+    'KEY_COUNTDAYS_START_DATE': countdays_start_date
   };
 
   Pebble.sendAppMessage(data,
@@ -150,9 +152,9 @@ function getConfigDataFromResponse(response) {
   return JSON.parse(decodeURIComponent(response));
 }
 
-function getCountDays(dreamDay) {
+function getCountDays(dreamday) {
     var today = new Date();
-    var timeDiff = Math.abs(today.getTime() - dreamDay.getTime());
+    var timeDiff = Math.abs(today.getTime() - dreamday.getTime());
     var diffDays = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
 
     return diffDays;
