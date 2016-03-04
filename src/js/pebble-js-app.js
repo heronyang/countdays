@@ -29,11 +29,11 @@ function weatherResponseHandler(responseText) {
   var temperature = Math.round(response.main.temp - 273.15);
   console.log('Temperature is ' + temperature);
 
-  var conditions = response.weather[0].main;
+  var conditions = response.weather[0].description;
   console.log('Conditions are ' + conditions);
 
   var dictionary = {
-    'KEY_TEMPERATURE': temperature,
+    'KEY_TEMPERATURE': temperature + '\xB0C',
     'KEY_CONDITIONS': conditions
   };
 

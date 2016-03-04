@@ -7,6 +7,7 @@ static TextLayer *time_layer;
 static TextLayer *date_layer;
 static TextLayer *countdays_layer;
 static TextLayer *weather_layer;
+static TextLayer *temperature_layer;
 
 static Layer *circle_layer;
 
@@ -34,6 +35,7 @@ static void layer_update_proc(Layer *, GContext *);
 static void draw_time(Layer *, GRect);
 static void draw_date(Layer *, GRect);
 static void draw_weather(Layer *, GRect);
+static void draw_temperature(Layer *, GRect);
 static void draw_countdays(Layer *, GRect);
 static void window_unload(Window *);
 
@@ -52,7 +54,7 @@ static void sync_error_callback(DictionaryResult dict_error,
 static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tuple, const Tuple* old_tuple, void* context) {
   switch (key) {
     case KEY_TEMPERATURE:
-      text_layer_set_text(weather_layer, new_tuple->value->cstring);
+      text_layer_set_text(temperature_layer, new_tuple->value->cstring);
       break;
 
     case KEY_CONDITIONS:
@@ -107,7 +109,7 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
     update_countdays(tick_time);
 
     if(tick_time->tm_min % WEATHER_GET_EVERY_MINUTES == 0) {
-        // update_weather();
+        update_weather();
     }
 
 }
@@ -177,6 +179,7 @@ static void window_load(Window *window) {
     draw_time(window_layer, bounds);
     draw_date(window_layer, bounds);
     draw_weather(window_layer, bounds);
+    draw_temperature(window_layer, bounds);
     draw_countdays(window_layer, bounds);
     draw_circle_layer(window_layer, bounds);
 
@@ -272,6 +275,23 @@ static void draw_weather(Layer *window_layer, GRect bounds) {
 
 }
 
+static void draw_temperature(Layer *window_layer, GRect bounds) {
+
+    static GFont font;
+
+    temperature_layer = text_layer_create(GRect(0,
+                TIME_LAYER_TOP - 70,
+                bounds.size.w,
+                TIME_LAYER_HEIGHT - 20));
+    font = fonts_get_system_font(FONT_KEY_GOTHIC_28);
+    text_layer_set_text_alignment(temperature_layer, GTextAlignmentCenter);
+    text_layer_set_font(temperature_layer, font);
+    text_layer_set_background_color(temperature_layer, TEMPERATURE_LAYER_BACKGROUND);
+    text_layer_set_text(temperature_layer, "-");
+    layer_add_child(window_layer, text_layer_get_layer(temperature_layer));
+
+}
+
 static void draw_countdays(Layer *window_layer, GRect bounds) {
 
     static GFont font;
@@ -293,6 +313,7 @@ static void window_unload(Window *window) {
     text_layer_destroy(time_layer);
     text_layer_destroy(date_layer);
     text_layer_destroy(weather_layer);
+    text_layer_destroy(temperature_layer);
     text_layer_destroy(countdays_layer);
 
 }
