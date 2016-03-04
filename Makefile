@@ -14,3 +14,6 @@ run: build
 
 logs: build
 	pebble logs -v --emulator chalk
+
+preivew:
+	pebble emu-app-config

@@ -2,14 +2,17 @@
 
 #include <pebble.h>
 
+#define FG_COLOR GColorWhite
 #define BG_COLOR GColorBlack
-#define FG_COLOR GColorYellow
 
-#define TIME_LAYER_BACKGROUND GColorBlue
-#define DATE_LAYER_BACKGROUND GColorGreen
-#define WEATHER_LAYER_BACKGROUND GColorRed
-#define TEMPERATURE_LAYER_BACKGROUND GColorCadetBlue
-#define COUNTDAYS_LAYER_BACKGROUND GColorPurple
+#define CIRCLE_FG_COLOR GColorBlack
+#define CIRCLE_BG_COLOR GColorDarkGray
+
+#define TIME_LAYER_BK_COLOR GColorBlue
+#define DATE_LAYER_BK_COLOR GColorGreen
+#define WEATHER_LAYER_BK_COLOR GColorRed
+#define TEMPERATURE_LAYER_BK_COLOR GColorCadetBlue
+#define COUNTDAYS_LAYER_BK_COLOR GColorPurple
 
 #define CIRCLE_THICKNESS 10
 #define CIRCLE_ANG_START -180

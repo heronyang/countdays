@@ -10,7 +10,8 @@
   },
   "appKeys": {
     "KEY_TEMPERATURE": 0,
-    "KEY_CONDITIONS": 1
+    "KEY_CONDITIONS": 1,
+    "KEY_COUNTDAYS": 2
   },
   "resources": {
     "media": []

@@ -10,6 +10,7 @@ static TextLayer *weather_layer;
 static TextLayer *temperature_layer;
 
 static Layer *circle_layer;
+static Layer *circle_bk_layer;
 
 static int hours, minutes;
 
@@ -31,6 +32,7 @@ static void update_countdays(struct tm *);
 static void update_weather();
 static void window_load(Window *);
 static void draw_circle_layer(Layer *, GRect);
+static void draw_circle_bk_layer(Layer *, GRect);
 static void layer_update_proc(Layer *, GContext *);
 static void draw_time(Layer *, GRect);
 static void draw_date(Layer *, GRect);
@@ -41,7 +43,8 @@ static void window_unload(Window *);
 
 enum {
     KEY_TEMPERATURE = 0,
-    KEY_CONDITIONS
+    KEY_CONDITIONS = 1,
+    KEY_COUNTDAYS = 2
 };
 
 static void sync_error_callback(DictionaryResult dict_error,
@@ -53,6 +56,7 @@ static void sync_error_callback(DictionaryResult dict_error,
 
 static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tuple, const Tuple* old_tuple, void* context) {
   switch (key) {
+
     case KEY_TEMPERATURE:
       text_layer_set_text(temperature_layer, new_tuple->value->cstring);
       break;
@@ -60,6 +64,11 @@ static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tup
     case KEY_CONDITIONS:
       text_layer_set_text(weather_layer, new_tuple->value->cstring);
       break;
+
+    case KEY_COUNTDAYS:
+      text_layer_set_text(countdays_layer, new_tuple->value->cstring);
+      break;
+
   }
 }
 
@@ -182,10 +191,12 @@ static void window_load(Window *window) {
     draw_temperature(window_layer, bounds);
     draw_countdays(window_layer, bounds);
     draw_circle_layer(window_layer, bounds);
+    draw_circle_bk_layer(window_layer, bounds);
 
     Tuplet initial_values[] = {
         TupletInteger(KEY_TEMPERATURE, (uint8_t) 0),
-        TupletCString(KEY_CONDITIONS, "-"),
+        TupletCString(KEY_CONDITIONS, ""),
+        TupletCString(KEY_COUNTDAYS, ""),
     };
 
     app_sync_init(&s_sync, s_sync_buffer, sizeof(s_sync_buffer),
@@ -204,10 +215,14 @@ static void draw_circle_layer(Layer *window_layer, GRect bounds) {
 
 }
 
-static void layer_update_proc(Layer *layer, GContext *ctx) {
+static void draw_circle_bk_layer(Layer *window_layer, GRect bounds) {
 
-    GRect bounds = layer_get_bounds(layer);
-    GRect frame = grect_inset(bounds, GEdgeInsets(0));
+    circle_bk_layer = layer_create(bounds);
+    layer_add_child(window_layer, circle_bk_layer);
+
+}
+
+static void layer_update_proc(Layer *layer, GContext *ctx) {
 
     int start_ang = CIRCLE_ANG_START;
     int end_ang = CIRCLE_ANG_START
@@ -215,13 +230,28 @@ static void layer_update_proc(Layer *layer, GContext *ctx) {
         * (CIRCLE_ANG_END - CIRCLE_ANG_START)
         / (24 * 60);
 
-    graphics_context_set_fill_color(ctx, FG_COLOR);
+    GRect bounds = layer_get_bounds(layer);
+    GRect frame = grect_inset(bounds, GEdgeInsets(0));
+
+    graphics_context_set_fill_color(ctx, CIRCLE_FG_COLOR);
     graphics_fill_radial(ctx,
             frame,
             GOvalScaleModeFitCircle,
             CIRCLE_THICKNESS,
             DEG_TO_TRIGANGLE(start_ang),
             DEG_TO_TRIGANGLE(end_ang)
+    );
+
+    GRect bounds_bk = layer_get_bounds(circle_bk_layer);
+    GRect frame_bk = grect_inset(bounds_bk, GEdgeInsets(0));
+
+    graphics_context_set_fill_color(ctx, CIRCLE_BG_COLOR);
+    graphics_fill_radial(ctx,
+            frame_bk,
+            GOvalScaleModeFitCircle,
+            CIRCLE_THICKNESS,
+            DEG_TO_TRIGANGLE(end_ang),
+            DEG_TO_TRIGANGLE(start_ang + 360)
     );
 
 }
@@ -237,7 +267,7 @@ static void draw_time(Layer *window_layer, GRect bounds){
     font = fonts_get_system_font(FONT_KEY_GOTHIC_28);
     text_layer_set_text_alignment(time_layer, GTextAlignmentCenter);
     text_layer_set_font(time_layer, font);
-    text_layer_set_background_color(time_layer, TIME_LAYER_BACKGROUND);
+    text_layer_set_background_color(time_layer, TIME_LAYER_BK_COLOR);
     layer_add_child(window_layer, text_layer_get_layer(time_layer));
 
 }
@@ -253,7 +283,7 @@ static void draw_date(Layer *window_layer, GRect bounds) {
     font = fonts_get_system_font(FONT_KEY_GOTHIC_28);
     text_layer_set_text_alignment(date_layer, GTextAlignmentCenter);
     text_layer_set_font(date_layer, font);
-    text_layer_set_background_color(date_layer, DATE_LAYER_BACKGROUND);
+    text_layer_set_background_color(date_layer, DATE_LAYER_BK_COLOR);
     layer_add_child(window_layer, text_layer_get_layer(date_layer));
 
 }
@@ -269,8 +299,7 @@ static void draw_weather(Layer *window_layer, GRect bounds) {
     font = fonts_get_system_font(FONT_KEY_GOTHIC_28);
     text_layer_set_text_alignment(weather_layer, GTextAlignmentCenter);
     text_layer_set_font(weather_layer, font);
-    text_layer_set_background_color(weather_layer, WEATHER_LAYER_BACKGROUND);
-    text_layer_set_text(weather_layer, "Loading...");
+    text_layer_set_background_color(weather_layer, WEATHER_LAYER_BK_COLOR);
     layer_add_child(window_layer, text_layer_get_layer(weather_layer));
 
 }
@@ -286,8 +315,7 @@ static void draw_temperature(Layer *window_layer, GRect bounds) {
     font = fonts_get_system_font(FONT_KEY_GOTHIC_28);
     text_layer_set_text_alignment(temperature_layer, GTextAlignmentCenter);
     text_layer_set_font(temperature_layer, font);
-    text_layer_set_background_color(temperature_layer, TEMPERATURE_LAYER_BACKGROUND);
-    text_layer_set_text(temperature_layer, "-");
+    text_layer_set_background_color(temperature_layer, TEMPERATURE_LAYER_BK_COLOR);
     layer_add_child(window_layer, text_layer_get_layer(temperature_layer));
 
 }
@@ -303,7 +331,7 @@ static void draw_countdays(Layer *window_layer, GRect bounds) {
     font = fonts_get_system_font(FONT_KEY_GOTHIC_28);
     text_layer_set_text_alignment(countdays_layer, GTextAlignmentCenter);
     text_layer_set_font(countdays_layer, font);
-    text_layer_set_background_color(countdays_layer, COUNTDAYS_LAYER_BACKGROUND);
+    text_layer_set_background_color(countdays_layer, COUNTDAYS_LAYER_BK_COLOR);
     layer_add_child(window_layer, text_layer_get_layer(countdays_layer));
 
 }
