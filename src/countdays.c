@@ -26,6 +26,7 @@ static char countdays_start_date_buffer[32];
 static AppSync s_sync;
 static uint8_t s_sync_buffer[64];
 
+char *translate_error(AppMessageResult result);
 static void init();
 static void init_callbacks();
 static void init_window();
@@ -61,36 +62,65 @@ enum {
 static void sync_error_callback(DictionaryResult dict_error,
         AppMessageResult app_message_error, void *context) {
 
-    APP_LOG(APP_LOG_LEVEL_DEBUG, "App Message Sync Error: %d", app_message_error);
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "Sync error: %s", translate_error(app_message_error));
 
 }
 
-static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tuple, const Tuple* old_tuple, void* context) {
-  switch (key) {
-
-    case KEY_TEMPERATURE:
-      APP_LOG(APP_LOG_LEVEL_DEBUG, "Get temperature: %s", new_tuple->value->cstring);
-      text_layer_set_text(temperature_layer, new_tuple->value->cstring);
-      break;
-
-    case KEY_CONDITIONS:
-      APP_LOG(APP_LOG_LEVEL_DEBUG, "Get conditions: %s", new_tuple->value->cstring);
-      text_layer_set_text(weather_layer, new_tuple->value->cstring);
-      break;
-
-    case KEY_COUNTDAYS:
-      APP_LOG(APP_LOG_LEVEL_DEBUG, "Get countdays: %s", new_tuple->value->cstring);
-      // text_layer_set_text(countdays_layer, new_tuple->value->cstring);
-      break;
-
-    case KEY_COUNTDAYS_START_DATE:
-      APP_LOG(APP_LOG_LEVEL_DEBUG, "Get countdays_start_date: %s", new_tuple->value->cstring);
-      snprintf(countdays_start_date_buffer,
-              sizeof(countdays_start_date_buffer),
-              "%s",
-              new_tuple->value->cstring);
-      break;
+char *translate_error(AppMessageResult result) {
+  switch (result) {
+    case APP_MSG_OK: return "APP_MSG_OK";
+    case APP_MSG_SEND_TIMEOUT: return "APP_MSG_SEND_TIMEOUT";
+    case APP_MSG_SEND_REJECTED: return "APP_MSG_SEND_REJECTED";
+    case APP_MSG_NOT_CONNECTED: return "APP_MSG_NOT_CONNECTED";
+    case APP_MSG_APP_NOT_RUNNING: return "APP_MSG_APP_NOT_RUNNING";
+    case APP_MSG_INVALID_ARGS: return "APP_MSG_INVALID_ARGS";
+    case APP_MSG_BUSY: return "APP_MSG_BUSY";
+    case APP_MSG_BUFFER_OVERFLOW: return "APP_MSG_BUFFER_OVERFLOW";
+    case APP_MSG_ALREADY_RELEASED: return "APP_MSG_ALREADY_RELEASED";
+    case APP_MSG_CALLBACK_ALREADY_REGISTERED: return "APP_MSG_CALLBACK_ALREADY_REGISTERED";
+    case APP_MSG_CALLBACK_NOT_REGISTERED: return "APP_MSG_CALLBACK_NOT_REGISTERED";
+    case APP_MSG_OUT_OF_MEMORY: return "APP_MSG_OUT_OF_MEMORY";
+    case APP_MSG_CLOSED: return "APP_MSG_CLOSED";
+    case APP_MSG_INTERNAL_ERROR: return "APP_MSG_INTERNAL_ERROR";
+    default: return "UNKNOWN ERROR";
   }
+}
+
+static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tuple, const Tuple* old_tuple, void* context) {
+
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "get tuple, key = %u, value = %s", (unsigned int)key, new_tuple->value->cstring);
+
+    if(strlen(new_tuple->value->cstring) == 0) {
+        return;
+    }
+
+    switch (key) {
+
+      case KEY_TEMPERATURE:
+          APP_LOG(APP_LOG_LEVEL_DEBUG, "Get temperature: %s", new_tuple->value->cstring);
+          text_layer_set_text(temperature_layer, new_tuple->value->cstring);
+          break;
+
+      case KEY_CONDITIONS:
+          APP_LOG(APP_LOG_LEVEL_DEBUG, "Get conditions: %s", new_tuple->value->cstring);
+          text_layer_set_text(weather_layer, new_tuple->value->cstring);
+          break;
+
+      case KEY_COUNTDAYS:
+          APP_LOG(APP_LOG_LEVEL_DEBUG, "Get countdays: %s", new_tuple->value->cstring);
+          text_layer_set_text(countdays_layer, new_tuple->value->cstring);
+          break;
+
+      case KEY_COUNTDAYS_START_DATE:
+          APP_LOG(APP_LOG_LEVEL_DEBUG, "Get countdays_start_date: %s", new_tuple->value->cstring);
+          snprintf(countdays_start_date_buffer,
+                  sizeof(countdays_start_date_buffer),
+                  "%s",
+                  new_tuple->value->cstring);
+          break;
+
+  }
+
 }
 
 int main(void) {
@@ -189,7 +219,7 @@ static void update_time(struct tm *tick_time) {
 
 static void update_date(struct tm *tick_time) {
 
-    strftime(date_buffer, sizeof(date_buffer), "%m/%d", tick_time);
+    strftime(date_buffer, sizeof(date_buffer), "%d", tick_time);
 
     text_layer_set_text(date_layer, date_buffer);
 
@@ -268,7 +298,7 @@ static void setupAppMessages() {
         TupletInteger(KEY_TEMPERATURE, (uint8_t) 0),
         TupletCString(KEY_CONDITIONS, ""),
         TupletCString(KEY_COUNTDAYS, ""),
-        TupletCString(KEY_COUNTDAYS_START_DATE, "dog"),
+        TupletCString(KEY_COUNTDAYS_START_DATE, COUNTDAYS_START_DATE_DEFAULT),
     };
 
     app_sync_init(&s_sync, s_sync_buffer, sizeof(s_sync_buffer),
@@ -389,10 +419,11 @@ static void draw_weather(Layer *window_layer, GRect bounds) {
                 WEATHER_LAYER_TOP,
                 bounds.size.w,
                 WEATHER_LAYER_HEIGHT));
-    font = fonts_get_system_font(FONT_KEY_GOTHIC_28);
+    font = fonts_get_system_font(FONT_KEY_GOTHIC_18);
     text_layer_set_text_alignment(weather_layer, GTextAlignmentCenter);
     text_layer_set_font(weather_layer, font);
     text_layer_set_background_color(weather_layer, WEATHER_LAYER_BK_COLOR);
+    text_layer_set_text_color(weather_layer, WEATHER_LAYER_FG_COLOR);
     layer_add_child(window_layer, text_layer_get_layer(weather_layer));
 
 }
@@ -402,13 +433,14 @@ static void draw_temperature(Layer *window_layer, GRect bounds) {
     static GFont font;
 
     temperature_layer = text_layer_create(GRect(0,
-                0,
+                TEMPERATURE_LAYER_TOP,
                 bounds.size.w,
-                0));
+                TEMPERATURE_LAYER_HEIGHT));
     font = fonts_get_system_font(FONT_KEY_GOTHIC_28);
     text_layer_set_text_alignment(temperature_layer, GTextAlignmentCenter);
     text_layer_set_font(temperature_layer, font);
     text_layer_set_background_color(temperature_layer, TEMPERATURE_LAYER_BK_COLOR);
+    text_layer_set_text_color(temperature_layer, TEMPERATURE_LAYER_FG_COLOR);
     layer_add_child(window_layer, text_layer_get_layer(temperature_layer));
 
 }

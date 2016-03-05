@@ -45,9 +45,13 @@ function weatherResponseHandler(responseText) {
 
 function sendWeatherToWatch(temperature, conditions) {
 
+  console.log("sendWeatherToWatch: " + temperature + ", " + conditions);
+
   var data = {
     'KEY_TEMPERATURE': temperature + '\xB0C',
-    'KEY_CONDITIONS': conditions
+    'KEY_CONDITIONS': conditions,
+    'KEY_COUNTDAYS': '',
+    'KEY_COUNTDAYS_START_DATE': ''
   };
 
   Pebble.sendAppMessage(data,
@@ -131,7 +135,12 @@ function setCountdaysFromResponse(response) {
 
 function sendCountdaysToWatch(countdays, countdays_start_date) {
 
+  console.log("countdays = " + countdays);
+  console.log("countdays_start_date = " + countdays_start_date);
+
   var data = {
+    'KEY_TEMPERATURE': '',
+    'KEY_CONDITIONS': '',
     'KEY_COUNTDAYS': countdays + '',
     'KEY_COUNTDAYS_START_DATE': countdays_start_date
   };
