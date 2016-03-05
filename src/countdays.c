@@ -44,9 +44,11 @@ static void draw_circle_bk_layer(Layer *, GRect);
 static void layer_update_proc(Layer *, GContext *);
 static void draw_time(Layer *, GRect);
 static void draw_date(Layer *, GRect);
+static void draw_date_block(Layer *);
 static void draw_weather(Layer *, GRect);
 static void draw_temperature(Layer *, GRect);
 static void draw_countdays(Layer *, GRect);
+static void draw_countdays_block(Layer *);
 static void window_unload(Window *);
 
 enum {
@@ -78,7 +80,7 @@ static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tup
 
     case KEY_COUNTDAYS:
       APP_LOG(APP_LOG_LEVEL_DEBUG, "Get countdays: %s", new_tuple->value->cstring);
-      text_layer_set_text(countdays_layer, new_tuple->value->cstring);
+      // text_layer_set_text(countdays_layer, new_tuple->value->cstring);
       break;
 
     case KEY_COUNTDAYS_START_DATE:
@@ -340,10 +342,11 @@ static void draw_time(Layer *window_layer, GRect bounds){
                 TIME_LAYER_TOP,
                 bounds.size.w,
                 TIME_LAYER_HEIGHT));
-    font = fonts_get_system_font(FONT_KEY_GOTHIC_28);
+    font = fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
     text_layer_set_text_alignment(time_layer, GTextAlignmentCenter);
     text_layer_set_font(time_layer, font);
     text_layer_set_background_color(time_layer, TIME_LAYER_BK_COLOR);
+    text_layer_set_text_color(time_layer, TIME_LAYER_FG_COLOR);
     layer_add_child(window_layer, text_layer_get_layer(time_layer));
 
 }
@@ -352,15 +355,29 @@ static void draw_date(Layer *window_layer, GRect bounds) {
 
     static GFont font;
 
-    date_layer = text_layer_create(GRect(0,
-                TIME_LAYER_TOP - 100,
-                bounds.size.w,
-                TIME_LAYER_HEIGHT));
+    draw_date_block(window_layer);
+
+    date_layer = text_layer_create(GRect(DATE_LAYER_LEFT + DATE_LAYER_LEFT_SHIFT,
+                DATE_LAYER_TOP,
+                DATE_WIDTH,
+                DATE_HEIGHT));
     font = fonts_get_system_font(FONT_KEY_GOTHIC_28);
-    text_layer_set_text_alignment(date_layer, GTextAlignmentCenter);
+    text_layer_set_text_alignment(date_layer, GTextAlignmentLeft);
     text_layer_set_font(date_layer, font);
     text_layer_set_background_color(date_layer, DATE_LAYER_BK_COLOR);
+    text_layer_set_text_color(date_layer, DATE_LAYER_FG_COLOR);
     layer_add_child(window_layer, text_layer_get_layer(date_layer));
+
+}
+
+static void draw_date_block(Layer *window_layer) {
+
+    TextLayer *block = text_layer_create(GRect(DATE_LAYER_LEFT,
+                0,
+                DATE_WIDTH,
+                DATE_LAYER_TOP + DATE_HEIGHT));
+    text_layer_set_background_color(block, DATE_LAYER_BK_COLOR);
+    layer_add_child(window_layer, text_layer_get_layer(block));
 
 }
 
@@ -369,9 +386,9 @@ static void draw_weather(Layer *window_layer, GRect bounds) {
     static GFont font;
 
     weather_layer = text_layer_create(GRect(0,
-                TIME_LAYER_TOP - 50,
+                0,
                 bounds.size.w,
-                TIME_LAYER_HEIGHT));
+                0));
     font = fonts_get_system_font(FONT_KEY_GOTHIC_28);
     text_layer_set_text_alignment(weather_layer, GTextAlignmentCenter);
     text_layer_set_font(weather_layer, font);
@@ -385,9 +402,9 @@ static void draw_temperature(Layer *window_layer, GRect bounds) {
     static GFont font;
 
     temperature_layer = text_layer_create(GRect(0,
-                TIME_LAYER_TOP - 70,
+                0,
                 bounds.size.w,
-                TIME_LAYER_HEIGHT - 20));
+                0));
     font = fonts_get_system_font(FONT_KEY_GOTHIC_28);
     text_layer_set_text_alignment(temperature_layer, GTextAlignmentCenter);
     text_layer_set_font(temperature_layer, font);
@@ -401,14 +418,29 @@ static void draw_countdays(Layer *window_layer, GRect bounds) {
     static GFont font;
 
     countdays_layer = text_layer_create(GRect(0,
-                TIME_LAYER_TOP - 140,
-                bounds.size.w,
-                TIME_LAYER_HEIGHT));
+                COUNTDAYS_LAYER_TOP,
+                COUNTDAYS_WIDTH,
+                COUNTDAYS_HEIGHT));
     font = fonts_get_system_font(FONT_KEY_GOTHIC_28);
-    text_layer_set_text_alignment(countdays_layer, GTextAlignmentCenter);
+    text_layer_set_text_alignment(countdays_layer, GTextAlignmentRight);
     text_layer_set_font(countdays_layer, font);
     text_layer_set_background_color(countdays_layer, COUNTDAYS_LAYER_BK_COLOR);
+    text_layer_set_text_color(countdays_layer, COUNTDAYS_LAYER_FG_COLOR);
+    text_layer_set_text(countdays_layer, "3245 ");
     layer_add_child(window_layer, text_layer_get_layer(countdays_layer));
+
+    draw_countdays_block(window_layer);
+
+}
+
+static void draw_countdays_block(Layer *window_layer) {
+
+    TextLayer *block = text_layer_create(GRect(0,
+                0,
+                COUNTDAYS_WIDTH,
+                COUNTDAYS_LAYER_TOP));
+    text_layer_set_background_color(block, COUNTDAYS_LAYER_BK_COLOR);
+    layer_add_child(window_layer, text_layer_get_layer(block));
 
 }
 
