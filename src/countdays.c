@@ -386,9 +386,9 @@ static void draw_weather(Layer *window_layer, GRect bounds) {
     static GFont font;
 
     weather_layer = text_layer_create(GRect(0,
-                0,
+                WEATHER_LAYER_TOP,
                 bounds.size.w,
-                0));
+                WEATHER_LAYER_HEIGHT));
     font = fonts_get_system_font(FONT_KEY_GOTHIC_28);
     text_layer_set_text_alignment(weather_layer, GTextAlignmentCenter);
     text_layer_set_font(weather_layer, font);

@@ -14,7 +14,9 @@
 #define DATE_LAYER_BK_COLOR GColorMidnightGreen
 #define DATE_LAYER_FG_COLOR GColorTiffanyBlue
 
-#define WEATHER_LAYER_BK_COLOR GColorRed
+#define WEATHER_LAYER_BK_COLOR GColorDarkGray
+#define WEATHER_LAYER_FG_COLOR GColorBlack
+
 #define TEMPERATURE_LAYER_BK_COLOR GColorCadetBlue
 
 #define COUNTDAYS_LAYER_BK_COLOR GColorOxfordBlue
@@ -39,6 +41,9 @@
 #define DATE_WIDTH 90
 #define DATE_HEIGHT 33
 #define DATE_LAYER_LEFT_SHIFT 3
+
+#define WEATHER_LAYER_TOP 118
+#define WEATHER_LAYER_HEIGHT 33
 
 #define APP_MESSAGE_INBOX_SIZE 128
 #define APP_MESSAGE_OUTBOX_SIZE 128
