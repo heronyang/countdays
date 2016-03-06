@@ -1,5 +1,5 @@
 var openWeatherMapAPIKey = '90973b6bdeeed6bb35d37c628c5a987a';
-var configureURL = 'https://countdays-config.herokuapp.com/';
+var configureURL = 'https://countdays-config.bitballoon.com/';
 
 function getWeatherFromOpenWeatherMap(coordinates) {
 
@@ -51,7 +51,7 @@ function sendWeatherToWatch(temperature, conditions) {
     'KEY_TEMPERATURE': temperature + '\xB0C',
     'KEY_CONDITIONS': conditions,
     'KEY_COUNTDAYS': '',
-    'KEY_COUNTDAYS_START_DATE': ''
+    'KEY_DREAMDAY': ''
   };
 
   Pebble.sendAppMessage(data,
@@ -80,7 +80,7 @@ function locationError(err) {
     'KEY_TEMPERATURE': ' ',
     'KEY_CONDITIONS': ' ',
     'KEY_COUNTDAYS': ' ',
-    'KEY_COUNTDAYS_START_DATE': ' '
+    'KEY_DREAMDAY': ' '
   });
 
 }
@@ -88,7 +88,6 @@ function locationError(err) {
 
 Pebble.addEventListener('ready', function(e) {
 
-  getWeather();
   console.log(e.type);
 
 });
@@ -111,9 +110,19 @@ var locationOptions = {
 Pebble.addEventListener('appmessage', function(e) {
 
   console.log('Received message: ' + JSON.stringify(e.payload));
+
+  setCountdaysFromWatchPayload(e.payload.KEY_DREAMDAY);
   getWeather();
 
 });
+
+function setCountdaysFromWatchPayload(storedDreamdayPayload) {
+
+  var dreamday = new Date(storedDreamdayPayload);
+  var countdays = getCountDays(dreamday);
+  sendCountdaysToWatch(countdays, storedDreamdayPayload);
+
+}
 
 Pebble.addEventListener('webviewclosed', function (e) {
 
@@ -133,16 +142,16 @@ function setCountdaysFromResponse(response) {
 
 }
 
-function sendCountdaysToWatch(countdays, countdays_start_date) {
+function sendCountdaysToWatch(countdays, dreamday) {
 
   console.log("countdays = " + countdays);
-  console.log("countdays_start_date = " + countdays_start_date);
+  console.log("dreamday = " + dreamday);
 
   var data = {
     'KEY_TEMPERATURE': '',
     'KEY_CONDITIONS': '',
     'KEY_COUNTDAYS': countdays + '',
-    'KEY_COUNTDAYS_START_DATE': countdays_start_date
+    'KEY_DREAMDAY': dreamday
   };
 
   Pebble.sendAppMessage(data,

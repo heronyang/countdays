@@ -12,7 +12,7 @@
     "KEY_TEMPERATURE": 0,
     "KEY_CONDITIONS": 1,
     "KEY_COUNTDAYS": 2,
-    "KEY_COUNTDAYS_START_DATE": 3
+    "KEY_DREAMDAY": 3
   },
   "resources": {
     "media": []

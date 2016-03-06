@@ -21,7 +21,7 @@ static int hours, minutes;
 static char time_buffer[8];
 static char date_buffer[16];
 
-static char countdays_start_date_buffer[32];
+static char dreamday_buffer[32];
 
 static AppSync s_sync;
 static uint8_t s_sync_buffer[64];
@@ -36,8 +36,7 @@ static void deinit();
 static void tick_handler(struct tm *, TimeUnits);
 static int isStartOfADay(struct tm *);
 static void update_date(struct tm *);
-static void update_countdays(struct tm *);
-static void update_weather();
+static void update_countdays_and_weather();
 static void window_load(Window *);
 static void setupAppMessages();
 static void draw_circle_layer(Layer *, GRect);
@@ -56,8 +55,16 @@ enum {
     KEY_TEMPERATURE = 0,
     KEY_CONDITIONS = 1,
     KEY_COUNTDAYS = 2,
-    KEY_COUNTDAYS_START_DATE = 3
+    KEY_DREAMDAY = 3
 };
+
+static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResult reason, void *context) {
+  APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed!");
+}
+
+static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
+  APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success!");
+}
 
 static void sync_error_callback(DictionaryResult dict_error,
         AppMessageResult app_message_error, void *context) {
@@ -111,10 +118,10 @@ static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tup
           text_layer_set_text(countdays_layer, new_tuple->value->cstring);
           break;
 
-      case KEY_COUNTDAYS_START_DATE:
-          APP_LOG(APP_LOG_LEVEL_DEBUG, "Get countdays_start_date: %s", new_tuple->value->cstring);
-          snprintf(countdays_start_date_buffer,
-                  sizeof(countdays_start_date_buffer),
+      case KEY_DREAMDAY:
+          APP_LOG(APP_LOG_LEVEL_DEBUG, "Get dreamday: %s", new_tuple->value->cstring);
+          snprintf(dreamday_buffer,
+                  sizeof(dreamday_buffer),
                   "%s",
                   new_tuple->value->cstring);
           break;
@@ -145,6 +152,9 @@ static void init() {
 
 static void init_callbacks() {
 
+    app_message_register_outbox_failed(outbox_failed_callback);
+    app_message_register_outbox_sent(outbox_sent_callback);
+
     app_message_open(APP_MESSAGE_INBOX_SIZE, APP_MESSAGE_OUTBOX_SIZE);
 
 }
@@ -163,25 +173,25 @@ static void init_window() {
 
 static void init_countdays() {
 
-    persist_delete(COUNTDAYS_START_DATE_KEY);
+    // persist_delete(DREAMDAY_KEY);
 
-    if (persist_exists(COUNTDAYS_START_DATE_KEY)) {
+    if (persist_exists(DREAMDAY_KEY)) {
 
-        persist_read_string(COUNTDAYS_START_DATE_KEY,
-                countdays_start_date_buffer,
-                sizeof(countdays_start_date_buffer));
+        persist_read_string(DREAMDAY_KEY,
+                dreamday_buffer,
+                sizeof(dreamday_buffer));
         APP_LOG(APP_LOG_LEVEL_DEBUG, "restore countdays start date");
 
     } else {
 
-        snprintf(countdays_start_date_buffer,
-                sizeof(countdays_start_date_buffer),
-                COUNTDAYS_START_DATE_DEFAULT);
+        snprintf(dreamday_buffer,
+                sizeof(dreamday_buffer),
+                DREAMDAY_DEFAULT);
         APP_LOG(APP_LOG_LEVEL_DEBUG, "use default countdays start date");
 
     }
 
-    APP_LOG(APP_LOG_LEVEL_DEBUG, "countdays_start_date_buffer = %s", countdays_start_date_buffer);
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "dreamday_buffer = %s", dreamday_buffer);
 
 }
 
@@ -189,14 +199,18 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
 
     update_time(tick_time);
 
-    if(isJustInited || isStartOfADay(tick_time)) {
+    if(isJustInited) {
         update_date(tick_time);
-        update_countdays(tick_time);
+        update_countdays_and_weather();
         isJustInited = false;
     }
 
+    if(isStartOfADay(tick_time)) {
+        update_date(tick_time);
+    }
+
     if(tick_time->tm_min % WEATHER_GET_EVERY_MINUTES == 0) {
-        update_weather();
+        update_countdays_and_weather();
     }
 
 }
@@ -225,35 +239,17 @@ static void update_date(struct tm *tick_time) {
 
 }
 
-static void update_countdays(struct tm *tick_time) {
+static void update_countdays_and_weather() {
 
-    /*
-    int value = 3;
-    DictionaryIterator *iter;
-    app_message_outbox_begin(&iter);
-    dict_write_int(iter, KEY_COUNTDAYS_START_DATE, &value, sizeof(int), true);
-    app_message_outbox_send();
-    */
-    // TODO
-    /*
-    DictionaryIterator *iter;
-    app_message_outbox_begin(&iter);
-
-    dict_write_uint8(iter, 0, 0);
-    app_message_outbox_send();
-    */
-
-}
-
-static void update_weather() {
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "update countdays");
 
     DictionaryIterator *iter;
     app_message_outbox_begin(&iter);
 
     if (!iter)  return;
 
-    int value = 1;
-    dict_write_int(iter, 1, &value, sizeof(int), true);
+    dict_write_cstring(iter, KEY_DREAMDAY,
+            dreamday_buffer);
     dict_write_end(iter);
 
     app_message_outbox_send();
@@ -263,11 +259,12 @@ static void update_weather() {
 static void deinit() {
 
     layer_destroy(circle_layer);
+    layer_destroy(circle_bk_layer);
     window_destroy(window);
 
     app_sync_deinit(&s_sync);
-    persist_write_string(COUNTDAYS_START_DATE_KEY,
-            countdays_start_date_buffer);
+    persist_write_string(DREAMDAY_KEY,
+            dreamday_buffer);
 
     APP_LOG(APP_LOG_LEVEL_DEBUG, "deinit");
 
@@ -288,8 +285,6 @@ static void window_load(Window *window) {
 
     setupAppMessages();
 
-    update_weather();
-
 }
 
 static void setupAppMessages() {
@@ -298,20 +293,12 @@ static void setupAppMessages() {
         TupletInteger(KEY_TEMPERATURE, (uint8_t) 0),
         TupletCString(KEY_CONDITIONS, ""),
         TupletCString(KEY_COUNTDAYS, ""),
-        TupletCString(KEY_COUNTDAYS_START_DATE, COUNTDAYS_START_DATE_DEFAULT),
+        TupletCString(KEY_DREAMDAY, ""),
     };
 
     app_sync_init(&s_sync, s_sync_buffer, sizeof(s_sync_buffer),
             initial_values, ARRAY_LENGTH(initial_values),
             sync_tuple_changed_callback, sync_error_callback, NULL);
-
-    /*
-    Tuplet update_values[] = {
-        CustomTupletCString(KEY_COUNTDAYS_START_DATE, "apple"),
-    };
-
-    app_sync_set(&s_sync, update_values, ARRAY_LENGTH(update_values));
-    */
 
 }
 
@@ -447,21 +434,20 @@ static void draw_temperature(Layer *window_layer, GRect bounds) {
 
 static void draw_countdays(Layer *window_layer, GRect bounds) {
 
+    draw_countdays_block(window_layer);
+
     static GFont font;
 
-    countdays_layer = text_layer_create(GRect(0,
+    countdays_layer = text_layer_create(GRect(COUNTDAYS_LAYER_LEFT,
                 COUNTDAYS_LAYER_TOP,
-                COUNTDAYS_WIDTH,
-                COUNTDAYS_HEIGHT));
+                COUNTDAYS_LAYER_WIDTH,
+                COUNTDAYS_LAYER_HEIGHT));
     font = fonts_get_system_font(FONT_KEY_GOTHIC_28);
-    text_layer_set_text_alignment(countdays_layer, GTextAlignmentRight);
+    text_layer_set_text_alignment(countdays_layer, GTextAlignmentLeft);
     text_layer_set_font(countdays_layer, font);
     text_layer_set_background_color(countdays_layer, COUNTDAYS_LAYER_BK_COLOR);
     text_layer_set_text_color(countdays_layer, COUNTDAYS_LAYER_FG_COLOR);
-    text_layer_set_text(countdays_layer, "3245 ");
     layer_add_child(window_layer, text_layer_get_layer(countdays_layer));
-
-    draw_countdays_block(window_layer);
 
 }
 
@@ -469,8 +455,8 @@ static void draw_countdays_block(Layer *window_layer) {
 
     TextLayer *block = text_layer_create(GRect(0,
                 0,
-                COUNTDAYS_WIDTH,
-                COUNTDAYS_LAYER_TOP));
+                COUNTDAYS_LAYER_LEFT + COUNTDAYS_LAYER_WIDTH,
+                COUNTDAYS_LAYER_TOP + COUNTDAYS_LAYER_HEIGHT));
     text_layer_set_background_color(block, COUNTDAYS_LAYER_BK_COLOR);
     layer_add_child(window_layer, text_layer_get_layer(block));
 
