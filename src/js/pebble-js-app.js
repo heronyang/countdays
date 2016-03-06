@@ -1,6 +1,11 @@
 var openWeatherMapAPIKey = '90973b6bdeeed6bb35d37c628c5a987a';
 var configureURL = 'https://countdays-config.bitballoon.com/';
 
+var unsendTemperature = '';
+var unsendCondition = '';
+var unsendCountdays = '';
+var unsendDreamday  = '';
+
 function getWeatherFromOpenWeatherMap(coordinates) {
 
   var url = getOpenWeatherMapRequestURL(coordinates);
@@ -47,22 +52,49 @@ function sendWeatherToWatch(temperature, conditions) {
 
   console.log("sendWeatherToWatch: " + temperature + ", " + conditions);
 
+  unsendTemperature = temperature + '\xB0C';
+  unsendCondition = conditions;
+
+  if(isAllDataArrived()) {
+    sendAllAppMessage();
+  }
+
+}
+
+function isAllDataArrived() {
+  return unsendTemperature !== '' &&
+  unsendCondition !== '' &&
+  unsendCountdays !== '' &&
+  unsendDreamday !== '';
+}
+
+function sendAllAppMessage() {
+
   var data = {
-    'KEY_TEMPERATURE': temperature + '\xB0C',
-    'KEY_CONDITIONS': conditions,
-    'KEY_COUNTDAYS': '',
-    'KEY_DREAMDAY': ''
+    'KEY_TEMPERATURE': unsendTemperature,
+    'KEY_CONDITIONS': unsendCondition,
+    'KEY_COUNTDAYS': unsendCountdays,
+    'KEY_DREAMDAY': unsendDreamday
   };
 
   Pebble.sendAppMessage(data,
     function(e) {
-      console.log('Weather info sent to Pebble successfully!');
+      console.log('Data sent to Pebble successfully!');
+      clearAllSentData();
     },
     function(e) {
-      console.log('Error sending weather info to Pebble!');
+      console.log('Error sending dat to Pebble!');
+      clearAllSentData();
     }
   );
 
+}
+
+function clearAllSentData() {
+  unsendTemperature = '';
+  unsendCondition = '';
+  unsendCountdays = '';
+  unsendDreamday = '';
 }
 
 function locationSuccess(pos) {
@@ -109,10 +141,8 @@ var locationOptions = {
 
 Pebble.addEventListener('appmessage', function(e) {
 
+  syncWithPhone(e.payload.KEY_DREAMDAY);
   console.log('Received message: ' + JSON.stringify(e.payload));
-
-  setCountdaysFromWatchPayload(e.payload.KEY_DREAMDAY);
-  getWeather();
 
 });
 
@@ -126,20 +156,25 @@ function setCountdaysFromWatchPayload(storedDreamdayPayload) {
 
 Pebble.addEventListener('webviewclosed', function (e) {
 
-  setCountdaysFromResponse(e.response);
+  var configData = getConfigDataFromResponse(e.response);
+  syncWithPhone(configData.dreamday);
+
   console.log(e.type + ', response= ' + e.response);
 
 });
 
-function setCountdaysFromResponse(response) {
+function syncWithPhone(dreamday) {
 
-  var configData = getConfigDataFromResponse(response);
+  getWeather();
+  setCountdaysFromDreamdayRaw(dreamday);
 
-  var dreamday = new Date(configData.dreamday);
+}
+
+function setCountdaysFromDreamdayRaw(dreamdayRaw){
+  var dreamday = new Date(dreamdayRaw);
   var countdays = getCountDays(dreamday);
 
-  sendCountdaysToWatch(countdays, configData.dreamday);
-
+  sendCountdaysToWatch(countdays, dreamdayRaw);
 }
 
 function sendCountdaysToWatch(countdays, dreamday) {
@@ -147,21 +182,12 @@ function sendCountdaysToWatch(countdays, dreamday) {
   console.log("countdays = " + countdays);
   console.log("dreamday = " + dreamday);
 
-  var data = {
-    'KEY_TEMPERATURE': '',
-    'KEY_CONDITIONS': '',
-    'KEY_COUNTDAYS': countdays + '',
-    'KEY_DREAMDAY': dreamday
-  };
+  unsendCountdays = countdays + '';
+  unsendDreamday = dreamday;
 
-  Pebble.sendAppMessage(data,
-    function(e) {
-      console.log('Dream day sent to Pebble successfully!');
-    },
-    function(e) {
-      console.log('Error sending dream day to Pebble!');
-    }
-  );
+  if(isAllDataArrived()) {
+    sendAllAppMessage();
+  }
 
 }
 

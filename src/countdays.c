@@ -1,9 +1,6 @@
 #include "pebble.h"
 #include "config.h"
 
-#define CustomTupletCString(_key, _cstring) \
-    ((const Tuplet) { .type = TUPLE_CSTRING, .key = _key, .cstring = { .data = _cstring, .length = strlen(_cstring) + 1 }})
-
 static Window *window;
 
 static TextLayer *time_layer;
@@ -19,12 +16,9 @@ static int isJustInited = true;
 static int hours, minutes;
 
 static char time_buffer[8];
-static char date_buffer[16];
+static char date_buffer[8];
 
-static char dreamday_buffer[32];
-
-static AppSync s_sync;
-static uint8_t s_sync_buffer[64];
+static char dreamday_buffer[64];
 
 char *translate_error(AppMessageResult result);
 static void init();
@@ -38,16 +32,15 @@ static int isStartOfADay(struct tm *);
 static void update_date(struct tm *);
 static void update_countdays_and_weather();
 static void window_load(Window *);
-static void setupAppMessages();
 static void draw_circle_layer(Layer *, GRect);
 static void draw_circle_bk_layer(Layer *, GRect);
 static void layer_update_proc(Layer *, GContext *);
 static void draw_time(Layer *, GRect);
 static void draw_date(Layer *, GRect);
 static void draw_date_block(Layer *);
+static void draw_countdays(Layer *, GRect);
 static void draw_weather(Layer *, GRect);
 static void draw_temperature(Layer *, GRect);
-static void draw_countdays(Layer *, GRect);
 static void draw_countdays_block(Layer *);
 static void window_unload(Window *);
 
@@ -58,19 +51,56 @@ enum {
     KEY_DREAMDAY = 3
 };
 
+static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
+
+    Tuple *temperature = dict_find(iterator, KEY_TEMPERATURE);
+    Tuple *conditions = dict_find(iterator, KEY_CONDITIONS);
+    Tuple *countdays = dict_find(iterator, KEY_COUNTDAYS);
+    Tuple *dreamday = dict_find(iterator, KEY_DREAMDAY);
+
+    if (temperature && strlen(temperature->value->cstring) != 0) {
+        text_layer_set_text(temperature_layer, (char *)temperature->value->cstring);
+        APP_LOG(APP_LOG_LEVEL_DEBUG, "Get temperature: %s", (char *)temperature->value->cstring);
+    } else {
+        APP_LOG(APP_LOG_LEVEL_INFO, "KEY_TEMPERATURE not received.");
+    }
+
+    if (conditions && strlen(conditions->value->cstring) != 0) {
+        text_layer_set_text(weather_layer, (char *)conditions->value->cstring);
+        APP_LOG(APP_LOG_LEVEL_DEBUG, "Get conditions: %s", (char *)conditions->value->cstring);
+    } else {
+        APP_LOG(APP_LOG_LEVEL_INFO, "KEY_CONDITIONS not received.");
+    }
+
+    if (countdays && strlen(countdays->value->cstring) != 0) {
+        text_layer_set_text(countdays_layer, (char *)countdays->value->cstring);
+        APP_LOG(APP_LOG_LEVEL_DEBUG, "Get countdays: %s (%d)", (char *)countdays->value->cstring, strlen(countdays->value->cstring));
+    } else {
+        APP_LOG(APP_LOG_LEVEL_INFO, "KEY_COUNTDAYS not received.");
+    }
+
+    if (dreamday && strlen(dreamday->value->cstring) != 0) {
+        snprintf(dreamday_buffer,
+                sizeof(dreamday_buffer),
+                "%s",
+                dreamday->value->cstring);
+        APP_LOG(APP_LOG_LEVEL_DEBUG, "Get dreamday: %s", (char *)dreamday->value->cstring);
+    } else {
+        APP_LOG(APP_LOG_LEVEL_INFO, "KEY_DREAMDAY not received.");
+    }
+
+}
+
+static void inbox_dropped_callback(AppMessageResult reason, void *context) {
+      APP_LOG(APP_LOG_LEVEL_ERROR, "Message dropped!");
+}
+
 static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResult reason, void *context) {
   APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed!");
 }
 
 static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
   APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success!");
-}
-
-static void sync_error_callback(DictionaryResult dict_error,
-        AppMessageResult app_message_error, void *context) {
-
-    APP_LOG(APP_LOG_LEVEL_DEBUG, "Sync error: %s", translate_error(app_message_error));
-
 }
 
 char *translate_error(AppMessageResult result) {
@@ -91,43 +121,6 @@ char *translate_error(AppMessageResult result) {
     case APP_MSG_INTERNAL_ERROR: return "APP_MSG_INTERNAL_ERROR";
     default: return "UNKNOWN ERROR";
   }
-}
-
-static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tuple, const Tuple* old_tuple, void* context) {
-
-    APP_LOG(APP_LOG_LEVEL_DEBUG, "get tuple, key = %u, value = %s", (unsigned int)key, new_tuple->value->cstring);
-
-    if(strlen(new_tuple->value->cstring) == 0) {
-        return;
-    }
-
-    switch (key) {
-
-      case KEY_TEMPERATURE:
-          APP_LOG(APP_LOG_LEVEL_DEBUG, "Get temperature: %s", new_tuple->value->cstring);
-          text_layer_set_text(temperature_layer, new_tuple->value->cstring);
-          break;
-
-      case KEY_CONDITIONS:
-          APP_LOG(APP_LOG_LEVEL_DEBUG, "Get conditions: %s", new_tuple->value->cstring);
-          text_layer_set_text(weather_layer, new_tuple->value->cstring);
-          break;
-
-      case KEY_COUNTDAYS:
-          APP_LOG(APP_LOG_LEVEL_DEBUG, "Get countdays: %s", new_tuple->value->cstring);
-          text_layer_set_text(countdays_layer, new_tuple->value->cstring);
-          break;
-
-      case KEY_DREAMDAY:
-          APP_LOG(APP_LOG_LEVEL_DEBUG, "Get dreamday: %s", new_tuple->value->cstring);
-          snprintf(dreamday_buffer,
-                  sizeof(dreamday_buffer),
-                  "%s",
-                  new_tuple->value->cstring);
-          break;
-
-  }
-
 }
 
 int main(void) {
@@ -152,6 +145,8 @@ static void init() {
 
 static void init_callbacks() {
 
+    app_message_register_inbox_received(inbox_received_callback);
+    app_message_register_inbox_dropped(inbox_dropped_callback);
     app_message_register_outbox_failed(outbox_failed_callback);
     app_message_register_outbox_sent(outbox_sent_callback);
 
@@ -262,7 +257,6 @@ static void deinit() {
     layer_destroy(circle_bk_layer);
     window_destroy(window);
 
-    app_sync_deinit(&s_sync);
     persist_write_string(DREAMDAY_KEY,
             dreamday_buffer);
 
@@ -277,28 +271,11 @@ static void window_load(Window *window) {
 
     draw_time(window_layer, bounds);
     draw_date(window_layer, bounds);
+    draw_countdays(window_layer, bounds);
     draw_weather(window_layer, bounds);
     draw_temperature(window_layer, bounds);
-    draw_countdays(window_layer, bounds);
     draw_circle_layer(window_layer, bounds);
     draw_circle_bk_layer(window_layer, bounds);
-
-    setupAppMessages();
-
-}
-
-static void setupAppMessages() {
-
-    Tuplet initial_values[] = {
-        TupletInteger(KEY_TEMPERATURE, (uint8_t) 0),
-        TupletCString(KEY_CONDITIONS, ""),
-        TupletCString(KEY_COUNTDAYS, ""),
-        TupletCString(KEY_DREAMDAY, ""),
-    };
-
-    app_sync_init(&s_sync, s_sync_buffer, sizeof(s_sync_buffer),
-            initial_values, ARRAY_LENGTH(initial_values),
-            sync_tuple_changed_callback, sync_error_callback, NULL);
 
 }
 
@@ -398,6 +375,25 @@ static void draw_date_block(Layer *window_layer) {
 
 }
 
+static void draw_countdays(Layer *window_layer, GRect bounds) {
+
+    draw_countdays_block(window_layer);
+
+    static GFont font;
+
+    countdays_layer = text_layer_create(GRect(COUNTDAYS_LAYER_LEFT,
+                COUNTDAYS_LAYER_TOP,
+                COUNTDAYS_LAYER_WIDTH,
+                COUNTDAYS_LAYER_HEIGHT));
+    font = fonts_get_system_font(FONT_KEY_GOTHIC_28);
+    text_layer_set_text_alignment(countdays_layer, GTextAlignmentLeft);
+    text_layer_set_font(countdays_layer, font);
+    text_layer_set_background_color(countdays_layer, COUNTDAYS_LAYER_BK_COLOR);
+    text_layer_set_text_color(countdays_layer, COUNTDAYS_LAYER_FG_COLOR);
+    layer_add_child(window_layer, text_layer_get_layer(countdays_layer));
+
+}
+
 static void draw_weather(Layer *window_layer, GRect bounds) {
 
     static GFont font;
@@ -429,25 +425,6 @@ static void draw_temperature(Layer *window_layer, GRect bounds) {
     text_layer_set_background_color(temperature_layer, TEMPERATURE_LAYER_BK_COLOR);
     text_layer_set_text_color(temperature_layer, TEMPERATURE_LAYER_FG_COLOR);
     layer_add_child(window_layer, text_layer_get_layer(temperature_layer));
-
-}
-
-static void draw_countdays(Layer *window_layer, GRect bounds) {
-
-    draw_countdays_block(window_layer);
-
-    static GFont font;
-
-    countdays_layer = text_layer_create(GRect(COUNTDAYS_LAYER_LEFT,
-                COUNTDAYS_LAYER_TOP,
-                COUNTDAYS_LAYER_WIDTH,
-                COUNTDAYS_LAYER_HEIGHT));
-    font = fonts_get_system_font(FONT_KEY_GOTHIC_28);
-    text_layer_set_text_alignment(countdays_layer, GTextAlignmentLeft);
-    text_layer_set_font(countdays_layer, font);
-    text_layer_set_background_color(countdays_layer, COUNTDAYS_LAYER_BK_COLOR);
-    text_layer_set_text_color(countdays_layer, COUNTDAYS_LAYER_FG_COLOR);
-    layer_add_child(window_layer, text_layer_get_layer(countdays_layer));
 
 }
 
