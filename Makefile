@@ -1,6 +1,6 @@
 PHONE_IP=192.168.1.221
 
-build: src/*.c
+build: src/*.c src/js/*.js
 	pebble build
 
 run_phone: build
@@ -12,7 +12,7 @@ logs_phone:
 run: build
 	pebble install -v --emulator chalk
 
-logs: build
+logs:
 	pebble logs -v --emulator chalk
 
 preivew:
