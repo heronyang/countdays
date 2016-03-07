@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1">
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.11.4/themes/smoothness/jquery-ui.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pure/0.6.0/pure-min.css">
+
+    <script src="https://code.jquery.com/jquery-1.10.2.js"></script>
+    <script src="https://code.jquery.com/ui/1.11.4/jquery-ui.js"></script>
+  
+  </head>
+
+  <body>
+
+    <h1>Enter New Dream Day</h1>
+
+    <i>Day counts to or from your dream day will be shown on the <b>left-top corner</b> on your watch.</i>
+
+    <div class="pure-g">
+      <div class="pure-u-1">
+        <form class="pure-form">
+          <fieldset>
+            <div class="pure-control-group">
+              <input type="text" id="dreamday" readonly="true"/>
+            </div>
+          </fieldset>
+        </form>
+        <p id="msg"></p>
+
+        <hr style="width:0px;"/>
+        <button class="pure-button pure-button-primary" id="submit_button">Save</button>
+      </div>
+    </div>
+
+    <style>
+
+    body {
+      padding: 10px;
+    }
+
+    </style>
+
+
+    <script>
+
+      $(function() {
+
+        $('#dreamday').datepicker();
+        $('#submit_button').click(function() {
+
+          var config = {
+            'dreamday': $('#dreamday').datepicker('getDate'),
+          };
+
+          var return_to = getQueryParam('return_to', 'pebblejs://close#');
+          document.location = return_to + encodeURIComponent(JSON.stringify(config));
+
+        });
+
+        $('#dreamday').change(function() {
+          var pickedDay = new Date($('#dreamday').datepicker('getDate'));
+          var countdays = getCountDays(pickedDay);
+          var msg = $('#msg');
+          if(isFutureDate(pickedDay)) {
+            msg.html('It\'s <b>' + countdays + '</b> day(s) from now.');
+          } else {
+            msg.html('It\'s <b>' + countdays + '</b> day(s) ago.');
+          }
+        });
+
+      });
+
+      function getCountDays(dreamday) {
+        var today = new Date();
+        var timeDiff = Math.abs(today.getTime() - dreamday.getTime());
+        var diffDays = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+
+        return diffDays;
+      }
+
+      function isFutureDate(d) {
+        var today = new Date();
+        return d > today;
+      }
+
+
+      function getQueryParam(variable, defaultValue) {
+
+        var query = location.search.substring(1);
+        var vars = query.split('&');
+
+        for (var i = 0; i < vars.length; i++) {
+          var pair = vars[i].split('=');
+          if (pair[0] === variable) {
+            return decodeURIComponent(pair[1]);
+          }
+        }
+
+        return defaultValue || false;
+
+      }
+
+    </script>
+  </body>
+
+</html>
